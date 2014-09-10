@@ -75,6 +75,9 @@ case "connect":
 	echo("Internal Gateway: " + internal_gw);
 	echo("Interface idx: \"" + tundevid + "\" (\"" + env("TUNDEV") + "\")");
 	
+	// Add direct route for the VPN gateway to avoid routing loops
+	run("route add " + env("VPNGATEWAY") + " mask 255.255.255.255 " + gw);
+
 	if (env("INTERNAL_IP4_MTU")) {
 	    echo("MTU: " + env("INTERNAL_IP4_MTU"));
 	    run("netsh interface ipv4 set subinterface \"" + tundevid +
@@ -100,10 +103,6 @@ case "connect":
 		run("netsh interface ip set address \"" + tundevid + "\" static " +
 			env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK") + " " + internal_gw + " 1");
 	}
-
-	// Add direct route for the VPN gateway to avoid routing loops
-	run("route add " + env("VPNGATEWAY") +
-            " mask 255.255.255.255 " + gw);
 
     if (env("INTERNAL_IP4_NBNS")) {
 		var wins = env("INTERNAL_IP4_NBNS").split(/ /);
