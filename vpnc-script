@@ -626,7 +626,7 @@ kernel_is_2_6_or_above() {
 
 do_pre_init() {
 	if [ "$OS" = "Linux" ]; then
-		if (exec 6<> /dev/net/tun) > /dev/null 2>&1 ; then
+		if (exec 6< /dev/net/tun) > /dev/null 2>&1 ; then
 			:
 		else # can't open /dev/net/tun
 			test -e /proc/sys/kernel/modprobe && `cat /proc/sys/kernel/modprobe` tun 2>/dev/null
