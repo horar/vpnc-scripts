@@ -37,6 +37,7 @@ function waitForInterface() {
 	return false;
 }
 
+
 // --------------------------------------------------------------
 // Script starts here
 // --------------------------------------------------------------
@@ -47,6 +48,7 @@ var ws = WScript.CreateObject("WScript.Shell");
 var env = ws.Environment("Process");
 
 // How to add the default internal route
+// -1 - Do not touch default route (but do other necessary route setups)
 // 0 - As interface gateway when setting properties
 // 1 - As a 0.0.0.0/0 route with a lower metric than the default route
 // 2 - As 0.0.0.0/1 + 128.0.0.0/1 routes (override the default route cleanly)
@@ -95,7 +97,7 @@ case "connect":
 		run("netsh interface ip set interface \"" + tundevid + "\" metric=1");
 	}
 	
-	if (env("CISCO_SPLIT_INC") || REDIRECT_GATEWAY_METHOD > 0) {
+	if (env("CISCO_SPLIT_INC") || REDIRECT_GATEWAY_METHOD != 0) {
 		run("netsh interface ip set address \"" + tundevid + "\" static " +
 			env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK"));
 	} else {
