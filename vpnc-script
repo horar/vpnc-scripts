@@ -369,6 +369,8 @@ modify_resolvconf_generic() {
 # and will be overwritten by vpnc
 # as long as the above mark is intact"
 
+	# If multiple domains are listed, prefer the first for "domain".
+	DOMAIN="${CISCO_DEF_DOMAIN%% *}"
 	# Remember the original value of CISCO_DEF_DOMAIN we need it later
 	CISCO_DEF_DOMAIN_ORIG="$CISCO_DEF_DOMAIN"
 	# Don't step on INTERNAL_IP4_DNS value, use a temporary variable
@@ -393,9 +395,8 @@ EOF
 				fi
 				;;
 			domain*)
-				if [ -n "$CISCO_DEF_DOMAIN" ]; then
-					LINE="domain $CISCO_DEF_DOMAIN"
-					CISCO_DEF_DOMAIN=""
+				if [ -n "$DOMAIN" ]; then
+					LINE="domain $DOMAIN"
 				fi
 				;;
 		esac
