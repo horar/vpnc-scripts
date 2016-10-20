@@ -121,6 +121,9 @@ if [ -r /etc/openwrt_release ] && [ -n "$OPENWRT_INTERFACE" ]; then
 	include /lib/network
 	MODIFYRESOLVCONF=modify_resolvconf_openwrt
 	RESTORERESOLVCONF=restore_resolvconf_openwrt
+elif [ -x /usr/bin/busctl ]; then  # For systemd-resolved (version 229 and above)
+	MODIFYRESOLVCONF=modify_resolved_manager
+	RESTORERESOLVCONF=restore_resolved_manager
 elif [ -x /sbin/resolvconf ]; then # Optional tool on Debian, Ubuntu, Gentoo and FreeBSD
 	MODIFYRESOLVCONF=modify_resolvconf_manager
 	RESTORERESOLVCONF=restore_resolvconf_manager
@@ -574,6 +577,60 @@ domain $CISCO_DEF_DOMAIN"
 
 restore_resolvconf_manager() {
 	/sbin/resolvconf -d $TUNDEV
+}
+
+AF_INET=2
+
+get_if_index() {
+	local link
+	link="$(ip link show dev "$1")" || return $?
+	echo ${link} | awk -F: '{print $1}'
+}
+
+busctl_call() {
+	local dest node
+	dest=org.freedesktop.resolve1
+	node=/org/freedesktop/resolve1
+	busctl call "$dest" "${node}" "${dest}.Manager" "$@"
+}
+
+busctl_set_nameservers() {
+	local if_index addresses args addr
+	if_index=$1
+	shift
+	addresses="$@"
+	args="$if_index $#"
+	for addr in ${addresses}; do
+		args="$args ${AF_INET} 4 $(echo $addr | sed 's/[.]/ /g')"
+	done
+	busctl_call SetLinkDNS 'ia(iay)' ${args}
+}
+
+busctl_set_search() {
+	local if_index domains args domain
+	if_index=$1
+	shift
+	domains="$@"
+	args="$if_index $#"
+	for domain in ${domains}; do
+		args="$args ${domain} false"
+	done
+	busctl_call SetLinkDomains 'ia(sb)' ${args}
+}
+
+modify_resolved_manager() {
+	local if_index
+	if_index=$(get_if_index $TUNDEV)
+	busctl_set_nameservers $if_index $INTERNAL_IP4_DNS
+	if [ -n "$CISCO_DEF_DOMAIN" ]; then
+		busctl_set_search $if_index $CISCO_DEF_DOMAIN
+	fi
+}
+
+restore_resolved_manager() {
+	local if_index
+	if_index=$(get_if_index $TUNDEV)
+	busctl_call RevertLink 'i' $if_index
 }
 
 # === resolv.conf handling via unbound =========
