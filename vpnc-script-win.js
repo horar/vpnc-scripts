@@ -67,36 +67,37 @@ case "connect":
 		(address_array[3] & netmask_array[3]) + 1
 	);
 	var internal_gw = internal_gw_array.join(".");
+	var tundevid = env("TUNIDX")
 	
 	echo("VPN Gateway: " + env("VPNGATEWAY"));
 	echo("Internal Address: " + env("INTERNAL_IP4_ADDRESS"));
 	echo("Internal Netmask: " + env("INTERNAL_IP4_NETMASK"));
 	echo("Internal Gateway: " + internal_gw);
-	echo("Interface: \"" + env("TUNDEV") + "\"");
+	echo("Interface idx: \"" + tundevid + "\" (\"" + env("TUNDEV") + "\")");
 	
 	if (env("INTERNAL_IP4_MTU")) {
 	    echo("MTU: " + env("INTERNAL_IP4_MTU"));
-	    run("netsh interface ipv4 set subinterface \"" + env("TUNDEV") +
+	    run("netsh interface ipv4 set subinterface \"" + tundevid +
 		"\" mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
 	    if (env("INTERNAL_IP6_ADDRESS")) {
-		run("netsh interface ipv6 set subinterface \"" + env("TUNDEV") +
+		run("netsh interface ipv6 set subinterface \"" + tundevid +
 		    "\" mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
 	    }
 	}
 
-	echo("Configuring \"" + env("TUNDEV") + "\" interface for Legacy IP...");
+	echo("Configuring \"" + tundevid + "\" interface for Legacy IP...");
 	
 	if (!env("CISCO_SPLIT_INC") && REDIRECT_GATEWAY_METHOD != 2) {
 		// Interface metric must be set to 1 in order to add a route with metric 1 since Windows Vista
-		run("netsh interface ip set interface \"" + env("TUNDEV") + "\" metric=1");
+		run("netsh interface ip set interface \"" + tundevid + "\" metric=1");
 	}
 	
 	if (env("CISCO_SPLIT_INC") || REDIRECT_GATEWAY_METHOD > 0) {
-		run("netsh interface ip set address \"" + env("TUNDEV") + "\" static " +
+		run("netsh interface ip set address \"" + tundevid + "\" static " +
 			env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK"));
 	} else {
 		// The default route will be added automatically
-		run("netsh interface ip set address \"" + env("TUNDEV") + "\" static " +
+		run("netsh interface ip set address \"" + tundevid + "\" static " +
 			env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK") + " " + internal_gw + " 1");
 	}
 
@@ -108,7 +109,7 @@ case "connect":
 		var wins = env("INTERNAL_IP4_NBNS").split(/ /);
 		for (var i = 0; i < wins.length; i++) {
 	                run("netsh interface ip add wins \"" +
-			    env("TUNDEV") + "\" " + wins[i]
+			    tundevid + "\" " + wins[i]
 			    + " index=" + (i+1));
 		}
 	}
@@ -117,7 +118,7 @@ case "connect":
 		var dns = env("INTERNAL_IP4_DNS").split(/ /);
 		for (var i = 0; i < dns.length; i++) {
 	                run("netsh interface ip add dns \"" +
-			    env("TUNDEV") + "\" " + dns[i]
+			    tundevid + "\" " + dns[i]
 			    + " index=" + (i+1));
 		}
 	}
@@ -155,9 +156,9 @@ case "connect":
 	echo("Route configuration done.");
 
         if (env("INTERNAL_IP6_ADDRESS")) {
-		echo("Configuring \"" + env("TUNDEV") + "\" interface for IPv6...");
+		echo("Configuring \"" + tundevid + "\" interface for IPv6...");
 
-		run("netsh interface ipv6 set address \"" + env("TUNDEV") + "\" " +
+		run("netsh interface ipv6 set address \"" + tundevid + "\" " +
 		    env("INTERNAL_IP6_ADDRESS") + " store=active");
 
 		echo("done.");
@@ -166,7 +167,7 @@ case "connect":
 	        echo("Configuring IPv6 networks:");
 	        if (env("INTERNAL_IP6_NETMASK") && !env("INTERNAL_IP6_NETMASK").match("/128$")) {
 			run("netsh interface ipv6 add route " + env("INTERNAL_IP6_NETMASK") +
-			    " \"" + env("TUNDEV") + "\" fe80::8 store=active")
+			    " \"" + tundevid + "\" fe80::8 store=active")
 		}
 
 	        if (env("CISCO_IPV6_SPLIT_INC")) {
@@ -175,11 +176,11 @@ case "connect":
 				var netmasklen = env("CISCO_SPLIT_INC_" + i +
 						 "_MASKLEN");
 				run("netsh interface ipv6 add route " + network + "/" +
-				    netmasklen + " \"" + env("TUNDEV") + "\" fe80::8 store=active")
+				    netmasklen + " \"" + tundevid + "\" fe80::8 store=active")
 			}
 		} else {
 			echo("Setting default IPv6 route through VPN.");
-			run("netsh interface ipv6 add route 2000::/3 \"" + env("TUNDEV") +
+			run("netsh interface ipv6 add route 2000::/3 \"" + tundevid +
 			    "\" fe80::8 store=active");
 		}
 		echo("IPv6 route configuration done.");
