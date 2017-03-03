@@ -5,18 +5,11 @@
 // needed by vpnc.
 //
 
+// --------------------------------------------------------------
+// Initial setup
+// --------------------------------------------------------------
 var internal_ip4_netmask = "255.255.255.0";
 
-// How to add the default internal route
-// -1 - Do not touch default route (but do other necessary route setups)
-// 0 - As interface gateway when setting properties
-// 1 - As a 0.0.0.0/0 route with a lower metric than the default route
-// 2 - As 0.0.0.0/1 + 128.0.0.0/1 routes (override the default route cleanly)
-var REDIRECT_GATEWAY_METHOD = 0;
-
-// --------------------------------------------------------------
-// Utilities
-// --------------------------------------------------------------
 var accumulatedExitCode = 0;
 
 var ws = WScript.CreateObject("WScript.Shell");
@@ -29,6 +22,21 @@ if (env("LOG2FILE")) {
 	var log = fs.OpenTextFile(tmpdir + "vpnc.log", 8, true);
 }
 
+// How to add the default internal route
+// -1 - Do not touch default route (but do other necessary route setups)
+// 0 - As interface gateway when setting properties
+// 1 - As a 0.0.0.0/0 route with a lower metric than the default route
+// 2 - As 0.0.0.0/1 + 128.0.0.0/1 routes (override the default route cleanly)
+if (env("REDIRECT_GATEWAY_METHOD")) {
+	var REDIRECT_GATEWAY_METHOD = env("REDIRECT_GATEWAY_METHOD");
+} else {
+	var REDIRECT_GATEWAY_METHOD = -1;
+}
+
+
+// --------------------------------------------------------------
+// Utilities
+// --------------------------------------------------------------
 function echo(msg)
 {
 	// TODO: prepend UTC? timestamp to every message
