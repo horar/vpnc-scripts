@@ -1,25 +1,73 @@
+//
 // vpnc-script-win.js
 //
 // Sets up the Network interface and the routes
 // needed by vpnc.
+//
+
+var internal_ip4_netmask = "255.255.255.0";
+
+// How to add the default internal route
+// -1 - Do not touch default route (but do other necessary route setups)
+// 0 - As interface gateway when setting properties
+// 1 - As a 0.0.0.0/0 route with a lower metric than the default route
+// 2 - As 0.0.0.0/1 + 128.0.0.0/1 routes (override the default route cleanly)
+var REDIRECT_GATEWAY_METHOD = 0;
 
 // --------------------------------------------------------------
 // Utilities
 // --------------------------------------------------------------
+var accumulatedExitCode = 0;
+
+var ws = WScript.CreateObject("WScript.Shell");
+var env = ws.Environment("Process");
+var comspec = ws.ExpandEnvironmentStrings("%comspec%");
+
+if (env("LOG2FILE")) {
+	var fs = WScript.CreateObject("Scripting.FileSystemObject");
+	var tmpdir = fs.GetSpecialFolder(2)+"\\";
+	var log = fs.OpenTextFile(tmpdir + "vpnc.log", 8, true);
+}
 
 function echo(msg)
 {
-	WScript.echo(msg);
+	// TODO: prepend UTC? timestamp to every message
+	if (env("LOG2FILE")) {
+		log.WriteLine(msg);
+	} else {
+		WScript.echo(msg);
+	}
 }
 
-function run(cmd)
+function echoMultiLine(msg)
 {
-	return (ws.Exec(cmd).StdOut.ReadAll());
+	if (env("LOG2FILE")) {
+		log.Write(msg);
+	} else {
+		WScript.echo(msg);
+	}
+}
+
+function exec(cmd)
+{
+	echo("<<-- [EXEC] " + cmd);
+	var oExec = ws.Exec(comspec + " /C \"" + cmd + "\" 2>&1");
+	oExec.StdIn.Close();
+	
+	var s = oExec.StdOut.ReadAll();
+	echoMultiLine(s);
+	
+	var status = oExec.Status;
+	var exitCode = oExec.ExitCode;
+	echo("-->> (exitCode: " + exitCode + ")");
+	accumulatedExitCode += exitCode;
+	
+	return s;
 }
 
 function getDefaultGateway()
 {
-	if (run("route print").match(/0\.0\.0\.0 *(0|128)\.0\.0\.0 *([0-9\.]*)/)) {
+	if (exec("route print").match(/0\.0\.0\.0 *(0|128)\.0\.0\.0 *([0-9\.]*)/)) {
 		return (RegExp.$2);
 	}
 	return ("");
@@ -30,7 +78,7 @@ function waitForInterface() {
 	for (var i = 0; i < 5; i++) {
 		echo("Waiting for interface to come up...");
 		WScript.Sleep(2000);
-		if (run("route print").match(if_route)) {
+		if (exec("route print").match(if_route)) {
 			return true;
 		}
 	}
@@ -41,19 +89,6 @@ function waitForInterface() {
 // --------------------------------------------------------------
 // Script starts here
 // --------------------------------------------------------------
-
-var internal_ip4_netmask = "255.255.255.0"
-
-var ws = WScript.CreateObject("WScript.Shell");
-var env = ws.Environment("Process");
-
-// How to add the default internal route
-// -1 - Do not touch default route (but do other necessary route setups)
-// 0 - As interface gateway when setting properties
-// 1 - As a 0.0.0.0/0 route with a lower metric than the default route
-// 2 - As 0.0.0.0/1 + 128.0.0.0/1 routes (override the default route cleanly)
-var REDIRECT_GATEWAY_METHOD = 0;
-
 switch (env("reason")) {
 case "pre-init":
 	break;
@@ -69,7 +104,7 @@ case "connect":
 		(address_array[3] & netmask_array[3]) + 1
 	);
 	var internal_gw = internal_gw_array.join(".");
-	var tundevid = env("TUNIDX")
+	var tundevid = env("TUNIDX");
 	
 	echo("VPN Gateway: " + env("VPNGATEWAY"));
 	echo("Internal Address: " + env("INTERNAL_IP4_ADDRESS"));
@@ -78,56 +113,48 @@ case "connect":
 	echo("Interface idx: \"" + tundevid + "\" (\"" + env("TUNDEV") + "\")");
 	
 	// Add direct route for the VPN gateway to avoid routing loops
-	run("route add " + env("VPNGATEWAY") + " mask 255.255.255.255 " + gw);
+	exec("route add " + env("VPNGATEWAY") + " mask 255.255.255.255 " + gw);
 
 	if (env("INTERNAL_IP4_MTU")) {
-	    echo("MTU: " + env("INTERNAL_IP4_MTU"));
-	    run("netsh interface ipv4 set subinterface \"" + tundevid +
-		"\" mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
-	    if (env("INTERNAL_IP6_ADDRESS")) {
-		run("netsh interface ipv6 set subinterface \"" + tundevid +
-		    "\" mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
-	    }
+		echo("MTU: " + env("INTERNAL_IP4_MTU"));
+		exec("netsh interface ipv4 set subinterface \"" + tundevid + "\" mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
+		if (env("INTERNAL_IP6_ADDRESS")) {
+			exec("netsh interface ipv6 set subinterface \"" + tundevid + "\" mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
+		}
 	}
 
 	echo("Configuring \"" + tundevid + "\" interface for Legacy IP...");
 	
 	if (!env("CISCO_SPLIT_INC") && REDIRECT_GATEWAY_METHOD != 2) {
 		// Interface metric must be set to 1 in order to add a route with metric 1 since Windows Vista
-		run("netsh interface ip set interface \"" + tundevid + "\" metric=1");
+		exec("netsh interface ip set interface \"" + tundevid + "\" metric=1");
 	}
 	
 	if (env("CISCO_SPLIT_INC") || REDIRECT_GATEWAY_METHOD != 0) {
-		run("netsh interface ip set address \"" + tundevid + "\" static " +
-			env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK"));
+		exec("netsh interface ip set address \"" + tundevid + "\" static " + env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK"));
 	} else {
 		// The default route will be added automatically
-		run("netsh interface ip set address \"" + tundevid + "\" static " +
-			env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK") + " " + internal_gw + " 1");
+		exec("netsh interface ip set address \"" + tundevid + "\" static " + env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK") + " " + internal_gw + " 1");
 	}
 
-    if (env("INTERNAL_IP4_NBNS")) {
+	if (env("INTERNAL_IP4_NBNS")) {
 		var wins = env("INTERNAL_IP4_NBNS").split(/ /);
 		for (var i = 0; i < wins.length; i++) {
-	                run("netsh interface ip add wins \"" +
-			    tundevid + "\" " + wins[i]
-			    + " index=" + (i+1));
+			exec("netsh interface ip add wins \"" + tundevid + "\" " + wins[i] + " index=" + (i+1));
 		}
 	}
 
-    if (env("INTERNAL_IP4_DNS")) {
+	if (env("INTERNAL_IP4_DNS")) {
 		var dns = env("INTERNAL_IP4_DNS").split(/ /);
 		for (var i = 0; i < dns.length; i++) {
-	                run("netsh interface ip add dns \"" +
-			    tundevid + "\" " + dns[i]
-			    + " index=" + (i+1));
+			exec("netsh interface ip add dns \"" + tundevid + "\" " + dns[i] + " index=" + (i+1));
 		}
 	}
 	echo("done.");
 
 	// Add internal network routes
-    echo("Configuring Legacy IP networks:");
-    if (env("CISCO_SPLIT_INC")) {
+	echo("Configuring Legacy IP networks:");
+	if (env("CISCO_SPLIT_INC")) {
 		// Waiting for the interface to be configured before to add routes
 		if (!waitForInterface()) {
 			echo("Interface does not seem to be up.");
@@ -136,10 +163,8 @@ case "connect":
 		for (var i = 0 ; i < parseInt(env("CISCO_SPLIT_INC")); i++) {
 			var network = env("CISCO_SPLIT_INC_" + i + "_ADDR");
 			var netmask = env("CISCO_SPLIT_INC_" + i + "_MASK");
-			var netmasklen = env("CISCO_SPLIT_INC_" + i +
-					 "_MASKLEN");
-			run("route add " + network + " mask " + netmask +
-			     " " + internal_gw);
+			var netmasklen = env("CISCO_SPLIT_INC_" + i + "_MASKLEN");
+			exec("route add " + network + " mask " + netmask + " " + internal_gw);
 		}
 	} else if (REDIRECT_GATEWAY_METHOD > 0) {
 		// Waiting for the interface to be configured before to add routes
@@ -148,41 +173,35 @@ case "connect":
 		}
 		
 		if (REDIRECT_GATEWAY_METHOD == 1) {
-			run("route add 0.0.0.0 mask 0.0.0.0 " + internal_gw + " metric 1");
+			exec("route add 0.0.0.0 mask 0.0.0.0 " + internal_gw + " metric 1");
 		} else {
-			run("route add 0.0.0.0 mask 128.0.0.0 " + internal_gw);
-			run("route add 128.0.0.0 mask 128.0.0.0 " + internal_gw);
+			exec("route add 0.0.0.0 mask 128.0.0.0 " + internal_gw);
+			exec("route add 128.0.0.0 mask 128.0.0.0 " + internal_gw);
 		}
 	}
 	echo("Route configuration done.");
 
-        if (env("INTERNAL_IP6_ADDRESS")) {
+	if (env("INTERNAL_IP6_ADDRESS")) {
 		echo("Configuring \"" + tundevid + "\" interface for IPv6...");
-
-		run("netsh interface ipv6 set address \"" + tundevid + "\" " +
-		    env("INTERNAL_IP6_ADDRESS") + " store=active");
-
+		exec("netsh interface ipv6 set address \"" + tundevid + "\" " + env("INTERNAL_IP6_ADDRESS") + " store=active");
 		echo("done.");
 
 		// Add internal network routes
-	        echo("Configuring IPv6 networks:");
-	        if (env("INTERNAL_IP6_NETMASK") && !env("INTERNAL_IP6_NETMASK").match("/128$")) {
-			run("netsh interface ipv6 add route " + env("INTERNAL_IP6_NETMASK") +
-			    " \"" + tundevid + "\" fe80::8 store=active")
+		echo("Configuring IPv6 networks:");
+		if (env("INTERNAL_IP6_NETMASK") && !env("INTERNAL_IP6_NETMASK").match("/128$")) {
+			exec("netsh interface ipv6 add route " + env("INTERNAL_IP6_NETMASK") + " \"" + tundevid + "\" fe80::8 store=active");
 		}
 
-	        if (env("CISCO_IPV6_SPLIT_INC")) {
+		if (env("CISCO_IPV6_SPLIT_INC")) {
 			for (var i = 0 ; i < parseInt(env("CISCO_IPV6_SPLIT_INC")); i++) {
 				var network = env("CISCO_IPV6_SPLIT_INC_" + i + "_ADDR");
-				var netmasklen = env("CISCO_SPLIT_INC_" + i +
-						 "_MASKLEN");
-				run("netsh interface ipv6 add route " + network + "/" +
-				    netmasklen + " \"" + tundevid + "\" fe80::8 store=active")
+				var netmasklen = env("CISCO_SPLIT_INC_" + i + "_MASKLEN");
+				exec("netsh interface ipv6 add route " + network + "/" + netmasklen + " \"" + tundevid + "\" fe80::8 store=active");
 			}
 		} else {
 			echo("Setting default IPv6 route through VPN.");
-			run("netsh interface ipv6 add route 2000::/3 \"" + tundevid +
-			    "\" fe80::8 store=active");
+			exec("netsh interface ipv6 add route 2000::/3 \"" + tundevid +
+				"\" fe80::8 store=active");
 		}
 		echo("IPv6 route configuration done.");
 	}
@@ -194,7 +213,11 @@ case "connect":
 	}
 	break;
 case "disconnect":
-	// Delete direct route for the VPN gateway to avoid
-	run("route delete " + env("VPNGATEWAY") + " mask 255.255.255.255");
+	// Delete direct route for the VPN gateway
+	exec("route delete " + env("VPNGATEWAY") + " mask 255.255.255.255");
 }
 
+if (env("LOG2FILE")) {
+	log.Close();
+}
+WScript.Quit(accumulatedExitCode);
