@@ -222,8 +222,42 @@ case "connect":
 	}
 	break;
 case "disconnect":
+	var gw = getDefaultGateway();
+	echo("Default Gateway:" + gw)
+
 	// Delete direct route for the VPN gateway
+	echo(">Deleting Direct Route for VPN Gateway");
 	exec("route delete " + env("VPNGATEWAY") + " mask 255.255.255.255");
+
+	// Restore direct route
+	echo(">Restoring Direct Route");
+	exec("route delete 0.0.0.0 mask 0.0.0.0 ");
+	exec("route add 0.0.0.0 mask 0.0.0.0 " + gw);
+
+	// ReSet Tunnel Adapter IP = nothing
+	echo(">Resetting Tunnel Adapter IP");
+	exec("netsh interface ip set address name=\"" + env("TUNDEV") + "\" source=static 1.0.0.0 255.255.255.255");
+	exec("netsh interface ip delete address \"" + env("TUNDEV") + "\" 1.0.0.0");
+
+	// Take Down IPv4 Split Tunnel Server-side Network Routes
+	if (env("CISCO_SPLIT_INC")) {
+		echo(">Removing IPv4 Split Tunnel INC Server-side Network Routes:");
+		for (var i = 0 ; i < parseInt(env("CISCO_SPLIT_INC")); i++) {
+			var network = env("CISCO_SPLIT_INC_" + i + "_ADDR");
+			var netmask = env("CISCO_SPLIT_INC_" + i + "_MASK");
+			exec("route delete " + network);
+		}
+	}
+
+	// Take Down IPv4 Split Tunnel Client-side Network Routes
+	if (env("CISCO_SPLIT_LCL")) {
+		echo("Removing IPv4 Split Tunnel Local Client-side Network Routes:");
+		for (var i = 0 ; i < parseInt(env("CISCO_SPLIT_LCL")); i++) {
+			var network = env("CISCO_SPLIT_LCL_" + i + "_ADDR");
+			var netmask = env("CISCO_SPLIT_LCL_" + i + "_MASK");
+			exec("route delete " + network);
+		}
+	}
 }
 
 if (env("LOG2FILE")) {
