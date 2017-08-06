@@ -114,6 +114,7 @@ case "connect":
 	var internal_gw = internal_gw_array.join(".");
 	var tundevid = env("TUNIDX");
 	
+	echo("Default Gateway:" + gw)
 	echo("VPN Gateway: " + env("VPNGATEWAY"));
 	echo("Internal Address: " + env("INTERNAL_IP4_ADDRESS"));
 	echo("Internal Netmask: " + env("INTERNAL_IP4_NETMASK"));
@@ -223,21 +224,24 @@ case "connect":
 	break;
 case "disconnect":
 	var gw = getDefaultGateway();
-	echo("Default Gateway:" + gw)
+	var tundevid = env("TUNIDX");
+
+	echo("Default Gateway: " + gw)
+	echo("Interface idx: \"" + tundevid + "\" (\"" + env("TUNDEV") + "\")");
 
 	// Delete direct route for the VPN gateway
-	echo(">Deleting Direct Route for VPN Gateway");
+	echo("Deleting Direct Route for VPN Gateway");
 	exec("route delete " + env("VPNGATEWAY") + " mask 255.255.255.255");
 
 	// Restore direct route
-	echo(">Restoring Direct Route");
+	echo("Restoring Direct Route");
 	exec("route delete 0.0.0.0 mask 0.0.0.0 ");
 	exec("route add 0.0.0.0 mask 0.0.0.0 " + gw);
 
 	// ReSet Tunnel Adapter IP = nothing
-	echo(">Resetting Tunnel Adapter IP");
-	exec("netsh interface ip set address name=\"" + env("TUNDEV") + "\" source=static 1.0.0.0 255.255.255.255");
-	exec("netsh interface ip delete address \"" + env("TUNDEV") + "\" 1.0.0.0");
+	echo("Resetting Tunnel Adapter IP");
+	exec("netsh interface ip set address \"" + tundevid + "\" source=static 1.0.0.0 255.255.255.255");
+	exec("netsh interface ip delete address \"" + tundevid + "\" 1.0.0.0");
 
 	// Take Down IPv4 Split Tunnel Server-side Network Routes
 	if (env("CISCO_SPLIT_INC")) {
