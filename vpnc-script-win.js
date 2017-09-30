@@ -118,44 +118,44 @@ case "connect":
 	echo("Internal Address: " + env("INTERNAL_IP4_ADDRESS"));
 	echo("Internal Netmask: " + env("INTERNAL_IP4_NETMASK"));
 	echo("Internal Gateway: " + internal_gw);
-	echo("Interface idx: \"" + env("TUNIDX") + "\" (\"" + env("TUNDEV") + "\")");
+	echo("Interface idx: " + env("TUNIDX") + " (\"" + env("TUNDEV") + "\")");
 	
 	// Add direct route for the VPN gateway to avoid routing loops
 	exec("route add " + env("VPNGATEWAY") + " mask 255.255.255.255 " + gw);
 
 	if (env("INTERNAL_IP4_MTU")) {
 		echo("MTU: " + env("INTERNAL_IP4_MTU"));
-		exec("netsh interface ipv4 set subinterface \"" + env("TUNIDX") + "\" mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
+		exec("netsh interface ipv4 set subinterface " + env("TUNIDX") + " mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
 		if (env("INTERNAL_IP6_ADDRESS")) {
-			exec("netsh interface ipv6 set subinterface \"" + env("TUNIDX") + "\" mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
+			exec("netsh interface ipv6 set subinterface " + env("TUNIDX") + " mtu=" + env("INTERNAL_IP4_MTU") + " store=active");
 		}
 	}
 
-	echo("Configuring \"" + env("TUNIDX") + "\" interface for Legacy IP...");
+	echo("Configuring " + env("TUNIDX") + " interface for Legacy IP...");
 	
 	if (!env("CISCO_SPLIT_INC") && REDIRECT_GATEWAY_METHOD != 2) {
 		// Interface metric must be set to 1 in order to add a route with metric 1 since Windows Vista
-		exec("netsh interface ip set interface \"" + env("TUNIDX") + "\" metric=1");
+		exec("netsh interface ip set interface " + env("TUNIDX") + " metric=1");
 	}
 	
 	if (env("CISCO_SPLIT_INC") || REDIRECT_GATEWAY_METHOD != 0) {
-		exec("netsh interface ip set address \"" + env("TUNIDX") + "\" static " + env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK"));
+		exec("netsh interface ip set address " + env("TUNIDX") + " static " + env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK"));
 	} else {
 		// The default route will be added automatically
-		exec("netsh interface ip set address \"" + env("TUNIDX") + "\" static " + env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK") + " " + internal_gw + " 1");
+		exec("netsh interface ip set address " + env("TUNIDX") + " static " + env("INTERNAL_IP4_ADDRESS") + " " + env("INTERNAL_IP4_NETMASK") + " " + internal_gw + " 1");
 	}
 
 	if (env("INTERNAL_IP4_NBNS")) {
 		var wins = env("INTERNAL_IP4_NBNS").split(/ /);
 		for (var i = 0; i < wins.length; i++) {
-			exec("netsh interface ip add wins \"" + env("TUNIDX") + "\" " + wins[i] + " index=" + (i+1));
+			exec("netsh interface ip add wins " + env("TUNIDX") + " " + wins[i] + " index=" + (i+1));
 		}
 	}
 
 	if (env("INTERNAL_IP4_DNS")) {
 		var dns = env("INTERNAL_IP4_DNS").split(/ /);
 		for (var i = 0; i < dns.length; i++) {
-			exec("netsh interface ip add dns \"" + env("TUNIDX") + "\" " + dns[i] + " index=" + (i+1));
+			exec("netsh interface ip add dns " + env("TUNIDX") + " " + dns[i] + " index=" + (i+1));
 		}
 	}
 	echo("done.");
@@ -190,25 +190,25 @@ case "connect":
 	echo("Route configuration done.");
 
 	if (env("INTERNAL_IP6_ADDRESS")) {
-		echo("Configuring \"" + env("TUNIDX") + "\" interface for IPv6...");
-		exec("netsh interface ipv6 set address \"" + env("TUNIDX") + "\" " + env("INTERNAL_IP6_ADDRESS") + " store=active");
+		echo("Configuring " + env("TUNIDX") + " interface for IPv6...");
+		exec("netsh interface ipv6 set address " + env("TUNIDX") + " " + env("INTERNAL_IP6_ADDRESS") + " store=active");
 		echo("done.");
 
 		// Add internal network routes
 		echo("Configuring IPv6 networks:");
 		if (env("INTERNAL_IP6_NETMASK") && !env("INTERNAL_IP6_NETMASK").match("/128$")) {
-			exec("netsh interface ipv6 add route " + env("INTERNAL_IP6_NETMASK") + " \"" + env("TUNIDX") + "\" fe80::8 store=active");
+			exec("netsh interface ipv6 add route " + env("INTERNAL_IP6_NETMASK") + " " + env("TUNIDX") + " fe80::8 store=active");
 		}
 
 		if (env("CISCO_IPV6_SPLIT_INC")) {
 			for (var i = 0 ; i < parseInt(env("CISCO_IPV6_SPLIT_INC")); i++) {
 				var network = env("CISCO_IPV6_SPLIT_INC_" + i + "_ADDR");
 				var netmasklen = env("CISCO_SPLIT_INC_" + i + "_MASKLEN");
-				exec("netsh interface ipv6 add route " + network + "/" + netmasklen + " \"" + env("TUNIDX") + "\" fe80::8 store=active");
+				exec("netsh interface ipv6 add route " + network + "/" + netmasklen + " " + env("TUNIDX") + " fe80::8 store=active");
 			}
 		} else {
 			echo("Setting default IPv6 route through VPN.");
-			exec("netsh interface ipv6 add route 2000::/3 \"" + env("TUNIDX") + "\" fe80::8 store=active");
+			exec("netsh interface ipv6 add route 2000::/3 " + env("TUNIDX") + " fe80::8 store=active");
 		}
 		echo("IPv6 route configuration done.");
 	}
@@ -223,7 +223,7 @@ case "disconnect":
 	var gw = getDefaultGateway();
 
 	echo("Default Gateway: " + gw)
-	echo("Interface idx: \"" + env("TUNIDX") + "\" (\"" + env("TUNDEV") + "\")");
+	echo("Interface idx: " + env("TUNIDX") + " (\"" + env("TUNDEV") + "\")");
 
 	// Delete direct route for the VPN gateway
 	echo("Deleting Direct Route for VPN Gateway");
@@ -236,8 +236,8 @@ case "disconnect":
 
 	// ReSet Tunnel Adapter IP = nothing
 	echo("Resetting Tunnel Adapter IP");
-	exec("netsh interface ip set address \"" + env("TUNIDX") + "\" source=static 1.0.0.0 255.255.255.255");
-	exec("netsh interface ip delete address \"" + env("TUNIDX") + "\" 1.0.0.0");
+	exec("netsh interface ip set address " + env("TUNIDX") + " source=static 1.0.0.0 255.255.255.255");
+	exec("netsh interface ip delete address " + env("TUNIDX") + " 1.0.0.0");
 
 	// Take Down IPv4 Split Tunnel Server-side Network Routes
 	if (env("CISCO_SPLIT_INC")) {
