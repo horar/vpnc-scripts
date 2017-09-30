@@ -210,8 +210,7 @@ case "connect":
 			}
 		} else {
 			echo("Setting default IPv6 route through VPN.");
-			exec("netsh interface ipv6 add route 2000::/3 \"" + tundevid +
-				"\" fe80::8 store=active");
+			exec("netsh interface ipv6 add route 2000::/3 \"" + tundevid + "\" fe80::8 store=active");
 		}
 		echo("IPv6 route configuration done.");
 	}
