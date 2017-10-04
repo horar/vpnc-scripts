@@ -116,12 +116,19 @@ else
 	ifconfig_syntax_ptpv6=""
 fi
 
+grep ^hosts /etc/nsswitch.conf|grep resolve >/dev/null 2>&1
+if [ $? = 0 ];then
+	RESOLVEDENABLED=1
+else
+	RESOLVEDENABLED=0
+fi
+
 if [ -r /etc/openwrt_release ] && [ -n "$OPENWRT_INTERFACE" ]; then
         . /etc/functions.sh
 	include /lib/network
 	MODIFYRESOLVCONF=modify_resolvconf_openwrt
 	RESTORERESOLVCONF=restore_resolvconf_openwrt
-elif [ -x /usr/bin/busctl ]; then  # For systemd-resolved (version 229 and above)
+elif [ -x /usr/bin/busctl ] && [ ${RESOLVEDENABLED} = 1 ]; then  # For systemd-resolved (version 229 and above)
 	MODIFYRESOLVCONF=modify_resolved_manager
 	RESTORERESOLVCONF=restore_resolved_manager
 elif [ -x /sbin/resolvconf ]; then # Optional tool on Debian, Ubuntu, Gentoo and FreeBSD
