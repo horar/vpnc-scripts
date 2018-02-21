@@ -252,6 +252,26 @@ if [ -n "$IPROUTE" ]; then
 		$IPROUTE route flush cache
 	}
 
+	set_exclude_route() {
+		# add explicit route to keep current routing for this target
+		# (keep traffic separate from VPN tunnel)
+		NETWORK="$1"
+		NETMASK="$2"
+		NETMASKLEN="$3"
+		$IPROUTE route add `$IPROUTE route get "$NETWORK/$NETMASKLEN" | fix_ip_get_output`
+		$IPROUTE route flush cache
+	}
+
+	del_exclude_route() {
+		# FIXME: In theory, this could delete existing routes which are
+		# identical to split-exclude routes specificed by VPNGATEWAY
+		NETWORK="$1"
+		NETMASK="$2"
+		NETMASKLEN="$3"
+		$IPROUTE route $route_syntax_del "$NETWORK/$NETMASKLEN"
+		$IPROUTE route flush cache
+	}
+
 	reset_default_route() {
 		if [ -s "$DEFAULT_ROUTE_FILE" ]; then
 			$IPROUTE route replace `cat "$DEFAULT_ROUTE_FILE"`
@@ -281,6 +301,15 @@ if [ -n "$IPROUTE" ]; then
 		$IPROUTE route flush cache
 	}
 
+	set_ipv6_exclude_route() {
+		# add explicit route to keep current routing for this target
+		# (keep traffic separate from VPN tunnel)
+		NETWORK="$1"
+		NETMASKLEN="$2"
+		$IPROUTE -6 route add `$IPROUTE route get "$NETWORK/$NETMASKLEN" | fix_ip_get_output`
+		$IPROUTE route flush cache
+	}
+
 	reset_ipv6_default_route() {
 		$IPROUTE -6 route del default dev "$TUNDEV"
 		$IPROUTE route flush cache
@@ -290,6 +319,15 @@ if [ -n "$IPROUTE" ]; then
 		NETWORK="$1"
 		NETMASKLEN="$2"
 		$IPROUTE -6 route del "$NETWORK/$NETMASKLEN" dev "$TUNDEV"
+		$IPROUTE -6 route flush cache
+	}
+
+	del_ipv6_exclude_route() {
+		# FIXME: In theory, this could delete existing routes which are
+		# identical to split-exclude routes specificed by VPNGATEWAY
+		NETWORK="$1"
+		NETMASKLEN="$2"
+		$IPROUTE -6 route del "$NETWORK/$NETMASKLEN"
 		$IPROUTE -6 route flush cache
 	}
 else # use route command
@@ -321,6 +359,28 @@ else # use route command
 		NETMASKLEN="$3"
 		del_network_route "$NETWORK" "$NETMASK" "$NETMASKLEN"
 		route add -net "$NETWORK" $route_syntax_netmask "$NETMASK" $route_syntax_gw "$INTERNAL_IP4_ADDRESS" $route_syntax_interface
+	}
+
+	set_exclude_route() {
+		NETWORK="$1"
+		NETMASK="$2"
+		NETMASKLEN="$3"
+		if [ -z "$DEFAULTGW" ]; then
+			DEFAULTGW="`get_default_gw`"
+		fi
+		# Add explicit route to keep traffic for this target separate
+		# from tunnel. FIXME: We use default gateway - this is our best
+		# guess in absence of "ip" command to query effective route.
+		route add -net "$NETWORK" $route_syntax_netmask "$NETMASK" $route_syntax_gw "$DEFAULTGW" $route_syntax_interface
+	}
+
+	del_exclude_route() {
+		# FIXME: This can delete existing routes in case they're
+		# identical to split-exclude routes specified by VPNGATEWAY
+		NETWORK="$1"
+		NETMASK="$2"
+		NETMASKLEN="$3"
+		route $route_syntax_del -net "$NETWORK" $route_syntax_netmask "$NETMASK"
 	}
 
 	reset_default_route() {
@@ -355,6 +415,16 @@ else # use route command
 		:
 	}
 
+	set_ipv6_exclude_route() {
+		NETWORK="$1"
+		NETMASK="$2"
+		# Add explicit route to keep traffic for this target separate
+		# from tunnel. FIXME: We use default gateway - this is our best
+		# guess in absence of "ip" command to query effective route.
+		route add -inet6 -net "$NETWORK/$NETMASK" "`get_default_gw`" $route_syntax_interface
+		:
+	}
+
 	reset_ipv6_default_route() {
 		route $route_syntax_del -inet6 default "$INTERNAL_IP6_ADDRESS"
 		:
@@ -364,6 +434,13 @@ else # use route command
 		NETWORK="$1"
 		NETMASK="$2"
 		route $route_syntax_del -inet6 "$NETWORK/$NETMASK" "$INTERNAL_IP6_ADDRESS"
+		:
+	}
+
+	del_ipv6_exclude_route() {
+		NETWORK="$1"
+		NETMASK="$2"
+		route $route_syntax_del -inet6 "$NETWORK/$NETMASK"
 		:
 	}
 
@@ -731,6 +808,26 @@ do_connect() {
 
 	set_vpngateway_route
 	do_ifconfig
+	if [ -n "$CISCO_SPLIT_EXC" ]; then
+		i=0
+		while [ $i -lt $CISCO_SPLIT_EXC ] ; do
+			eval NETWORK="\${CISCO_SPLIT_EXC_${i}_ADDR}"
+			eval NETMASK="\${CISCO_SPLIT_EXC_${i}_MASK}"
+			eval NETMASKLEN="\${CISCO_SPLIT_EXC_${i}_MASKLEN}"
+			set_exclude_route "$NETWORK" "$NETMASK" "$NETMASKLEN"
+			i=`expr $i + 1`
+		done
+	fi
+	if [ -n "$CISCO_IPV6_SPLIT_EXC" ]; then
+		# untested
+		i=0
+		while [ $i -lt $CISCO_IPV6_SPLIT_EXC ] ; do
+			eval NETWORK="\${CISCO_IPV6_SPLIT_EXC_${i}_ADDR}"
+			eval NETMASKLEN="\${CISCO_IPV6_SPLIT_EXC_${i}_MASKLEN}"
+			set_ipv6_exclude_route "$NETWORK" "$NETMASKLEN"
+			i=`expr $i + 1`
+		done
+	fi
 	if [ -n "$CISCO_SPLIT_INC" ]; then
 		i=0
 		while [ $i -lt $CISCO_SPLIT_INC ] ; do
@@ -798,6 +895,26 @@ do_disconnect() {
 		done
 	else
 		reset_default_route
+	fi
+	if [ -n "$CISCO_SPLIT_EXC" ]; then
+		i=0
+		while [ $i -lt $CISCO_SPLIT_EXC ] ; do
+			eval NETWORK="\${CISCO_SPLIT_EXC_${i}_ADDR}"
+			eval NETMASK="\${CISCO_SPLIT_EXC_${i}_MASK}"
+			eval NETMASKLEN="\${CISCO_SPLIT_EXC_${i}_MASKLEN}"
+			del_exclude_route "$NETWORK" "$NETMASK" "$NETMASKLEN"
+			i=`expr $i + 1`
+		done
+	fi
+	if [ -n "$CISCO_IPV6_SPLIT_EXC" ]; then
+		# untested
+		i=0
+		while [ $i -lt $CISCO_IPV6_SPLIT_EXC ] ; do
+			eval NETWORK="\${CISCO_IPV6_SPLIT_EXC_${i}_ADDR}"
+			eval NETMASKLEN="\${CISCO_IPV6_SPLIT_EXC_${i}_MASKLEN}"
+			del_ipv6_exclude_route "$NETWORK" "$NETMASKLEN"
+			i=`expr $i + 1`
+		done
 	fi
 	if [ -n "$CISCO_IPV6_SPLIT_INC" ]; then
 		i=0
