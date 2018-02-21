@@ -187,7 +187,7 @@ do_ifconfig() {
 	fi
 
 	if [ -n "$INTERNAL_IP4_NETMASK" ]; then
-		set_network_route $INTERNAL_IP4_NETADDR $INTERNAL_IP4_NETMASK $INTERNAL_IP4_NETMASKLEN
+		set_network_route "$INTERNAL_IP4_NETADDR" "$INTERNAL_IP4_NETMASK" "$INTERNAL_IP4_NETMASKLEN" "$TUNDEV"
 	fi
 
 	# If the netmask is provided, it contains the address _and_ netmask
@@ -248,7 +248,13 @@ if [ -n "$IPROUTE" ]; then
 		NETWORK="$1"
 		NETMASK="$2"
 		NETMASKLEN="$3"
-		$IPROUTE route replace "$NETWORK/$NETMASKLEN" dev "$TUNDEV"
+		NETDEV="$4"
+		NETGW="$5"
+		if [ -n "$NETGW" ]; then
+			$IPROUTE route replace "$NETWORK/$NETMASKLEN" dev "$NETDEV" via "$NETGW"
+		else
+			$IPROUTE route replace "$NETWORK/$NETMASKLEN" dev "$NETDEV"
+		fi
 		$IPROUTE route flush cache
 	}
 
@@ -284,7 +290,8 @@ if [ -n "$IPROUTE" ]; then
 		NETWORK="$1"
 		NETMASK="$2"
 		NETMASKLEN="$3"
-		$IPROUTE route $route_syntax_del "$NETWORK/$NETMASKLEN" dev "$TUNDEV"
+		NETDEV="$4"
+		$IPROUTE route $route_syntax_del "$NETWORK/$NETMASKLEN" dev "$NETDEV"
 		$IPROUTE route flush cache
 	}
 
@@ -297,7 +304,13 @@ if [ -n "$IPROUTE" ]; then
 	set_ipv6_network_route() {
 		NETWORK="$1"
 		NETMASKLEN="$2"
-		$IPROUTE -6 route replace "$NETWORK/$NETMASKLEN" dev "$TUNDEV"
+		NETDEV="$3"
+		NETGW="$4"
+		if [ -n "$NETGW" ]; then
+			$IPROUTE -6 route replace "$NETWORK/$NETMASKLEN" dev "$NETDEV" via "$NETGW"
+		else
+			$IPROUTE -6 route replace "$NETWORK/$NETMASKLEN" dev "$NETDEV"
+		fi
 		$IPROUTE route flush cache
 	}
 
@@ -318,7 +331,8 @@ if [ -n "$IPROUTE" ]; then
 	del_ipv6_network_route() {
 		NETWORK="$1"
 		NETMASKLEN="$2"
-		$IPROUTE -6 route del "$NETWORK/$NETMASKLEN" dev "$TUNDEV"
+		NETDEV="$3"
+		$IPROUTE -6 route del "$NETWORK/$NETMASKLEN" dev "$NETDEV"
 		$IPROUTE -6 route flush cache
 	}
 
@@ -357,7 +371,12 @@ else # use route command
 		NETWORK="$1"
 		NETMASK="$2"
 		NETMASKLEN="$3"
-		route add -net "$NETWORK" $route_syntax_netmask "$NETMASK" $route_syntax_gw "$INTERNAL_IP4_ADDRESS" $route_syntax_interface
+		if [ -n "$5" ]; then
+			NETGW="$5"
+		else
+			NETGW="$INTERNAL_IP4_ADDRESS"
+		fi
+		route add -net "$NETWORK" $route_syntax_netmask "$NETMASK" $route_syntax_gw "$NETGW" $route_syntax_interface
 	}
 
 	set_exclude_route() {
@@ -394,7 +413,12 @@ else # use route command
 		NETWORK="$1"
 		NETMASK="$2"
 		NETMASKLEN="$3"
-		route $route_syntax_del -net "$NETWORK" $route_syntax_netmask "$NETMASK" $route_syntax_gw "$INTERNAL_IP4_ADDRESS"
+		if [ -n "$5" ]; then
+			NETGW="$5"
+		else
+			NETGW="$INTERNAL_IP4_ADDRESS"
+		fi
+		route $route_syntax_del -net "$NETWORK" $route_syntax_netmask "$NETMASK" $route_syntax_gw "$NETGW"
 	}
 
 	set_ipv6_default_route() {
@@ -404,7 +428,13 @@ else # use route command
 	set_ipv6_network_route() {
 		NETWORK="$1"
 		NETMASK="$2"
-		route add -inet6 -net "$NETWORK/$NETMASK" "$INTERNAL_IP6_ADDRESS" $route_syntax_interface
+		if [ -n "$4" ]; then
+			NETGW="$4"
+		else
+			NETGW="$INTERNAL_IP6_ADDRESS"
+		fi
+
+		route add -inet6 -net "$NETWORK/$NETMASK" "$NETGW" $route_syntax_interface
 		:
 	}
 
@@ -426,7 +456,12 @@ else # use route command
 	del_ipv6_network_route() {
 		NETWORK="$1"
 		NETMASK="$2"
-		route $route_syntax_del -inet6 "$NETWORK/$NETMASK" "$INTERNAL_IP6_ADDRESS"
+		if [ -n "$4" ]; then
+			NETGW="$4"
+		else
+			NETGW="$INTERNAL_IP6_ADDRESS"
+		fi
+		route $route_syntax_del -inet6 "$NETWORK/$NETMASK" "$NETGW"
 		:
 	}
 
@@ -828,7 +863,7 @@ do_connect() {
 			eval NETMASK="\${CISCO_SPLIT_INC_${i}_MASK}"
 			eval NETMASKLEN="\${CISCO_SPLIT_INC_${i}_MASKLEN}"
 			if [ "$NETWORK" != "0.0.0.0" ]; then
-				set_network_route "$NETWORK" "$NETMASK" "$NETMASKLEN"
+				set_network_route "$NETWORK" "$NETMASK" "$NETMASKLEN" "$TUNDEV"
 			else
 				set_default_route
 			fi
@@ -836,7 +871,7 @@ do_connect() {
 		done
 		for i in $INTERNAL_IP4_DNS ; do
 			echo "$i" | grep : >/dev/null || \
-				set_network_route "$i" "255.255.255.255" "32"
+				set_network_route "$i" "255.255.255.255" "32" "$TUNDEV"
 		done
 	elif [ -n "$INTERNAL_IP4_ADDRESS" ]; then
 		set_default_route
@@ -847,7 +882,7 @@ do_connect() {
 			eval NETWORK="\${CISCO_IPV6_SPLIT_INC_${i}_ADDR}"
 			eval NETMASKLEN="\${CISCO_IPV6_SPLIT_INC_${i}_MASKLEN}"
 			if [ $NETMASKLEN -lt 128 ]; then
-				set_ipv6_network_route "$NETWORK" "$NETMASKLEN"
+				set_ipv6_network_route "$NETWORK" "$NETMASKLEN" "$TUNDEV"
 			else
 				set_ipv6_default_route
 			fi
@@ -855,7 +890,7 @@ do_connect() {
 		done
 		for i in $INTERNAL_IP4_DNS ; do
 			if echo "$i" | grep : >/dev/null; then
-				set_ipv6_network_route "$i" "128"
+				set_ipv6_network_route "$i" "128" "$TUNDEV"
 			fi
 		done
 	elif [ -n "$INTERNAL_IP6_NETMASK" -o -n "$INTERNAL_IP6_ADDRESS" ]; then
@@ -877,14 +912,14 @@ do_disconnect() {
 			if [ "$NETWORK" != "0.0.0.0" ]; then
 				# FIXME: This doesn't restore previously overwritten
 				#        routes.
-				del_network_route "$NETWORK" "$NETMASK" "$NETMASKLEN"
+				del_network_route "$NETWORK" "$NETMASK" "$NETMASKLEN" "$TUNDEV"
 			else
 				reset_default_route
 			fi
 			i=`expr $i + 1`
 		done
 		for i in $INTERNAL_IP4_DNS ; do
-			del_network_route "$i" "255.255.255.255" "32"
+			del_network_route "$i" "255.255.255.255" "32" "$TUNDEV"
 		done
 	else
 		reset_default_route
@@ -917,12 +952,12 @@ do_disconnect() {
 			if [ $NETMASKLEN -eq 0 ]; then
 				reset_ipv6_default_route
 			else
-				del_ipv6_network_route "$NETWORK" "$NETMASKLEN"
+				del_ipv6_network_route "$NETWORK" "$NETMASKLEN" "$TUNDEV"
 			fi
 			i=`expr $i + 1`
 		done
 		for i in $INTERNAL_IP6_DNS ; do
-			del_ipv6_network_route "$i" "128"
+			del_ipv6_network_route "$i" "128" "$TUNDEV"
 		done
 	elif [ -n "$INTERNAL_IP6_NETMASK" -o -n "$INTERNAL_IP6_ADDRESS" ]; then
 		reset_ipv6_default_route
