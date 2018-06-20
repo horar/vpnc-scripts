@@ -154,7 +154,7 @@
 # David Woodhouse <dwmw2@infradead.org>
 # 2009-06-06
 
-IP=/sbin/ip
+IP="`which ip 2> /dev/null | grep '^/'`"
 SCRIPTNAME=`basename $0`
 NETNSNAME=$SCRIPTNAME
 

@@ -39,6 +39,8 @@
 #  - AAAA queries return the A result, converted to the above IPv6 space.
 #  - PTR queries within the IPv6 space converted appropriately.
 
+IP="`which ip 2> /dev/null | grep '^/'`"
+
 connect_parent()
 {
     # XXX: How do we work out what it _really_ is?
@@ -53,17 +55,17 @@ connect_parent()
     # XXX: If we do this too soon (before the unshare), we're just
     # giving it to our _own_ netns. which achieves nothing.
     # So give it away until we _can't_ give it away any more.
-    while  /sbin/ip link set $TUNDEV netns $CHILDPID 2>/dev/null; do
+    while $IP link set $TUNDEV netns $CHILDPID 2>/dev/null; do
 	sleep 0.1
     done
 
     # Wait for the ptrtd tundev to appear in this namespace
-    while ! ip link show $RETURNDEV >/dev/null 2>&1 ; do
+    while ! $IP link show $RETURNDEV >/dev/null 2>&1 ; do
 	sleep 1
     done
-    /sbin/ip link set $RETURNDEV up
-    /sbin/ip addr add fe80::1 dev $RETURNDEV
-    /sbin/ip route add fec0:0:0:ffff::/64 dev $RETURNDEV
+    $IP link set $RETURNDEV up
+    $IP addr add fe80::1 dev $RETURNDEV
+    $IP route add fec0:0:0:ffff::/64 dev $RETURNDEV
 
     # XXX: Local hack -- my company's VPN server returns
     # "foo.company.com" instead of just "company.com".
@@ -94,17 +96,17 @@ connect()
     fi
 
     # Wait for the tundev to appear in this namespace
-    while ! ip link show $TUNDEV >/dev/null 2>&1 ; do
+    while ! $IP link show $TUNDEV >/dev/null 2>&1 ; do
 	sleep 0.1
     done
 
     # Set up Legacy IP in the new namespace
-    /sbin/ip link set lo up
-    /sbin/ip link set $TUNDEV up
-    /sbin/ip -4 addr add $INTERNAL_IP4_ADDRESS dev $TUNDEV
-    /sbin/ip -4 route add default dev $TUNDEV
+    $IP link set lo up
+    $IP link set $TUNDEV up
+    $IP -4 addr add $INTERNAL_IP4_ADDRESS dev $TUNDEV
+    $IP -4 route add default dev $TUNDEV
     if [ "$INTERNAL_IP4_MTU" != "" ]; then
-	/sbin/ip link set $TUNDEV mtu $INTERNAL_IP4_MTU
+	$IP link set $TUNDEV mtu $INTERNAL_IP4_MTU
     fi
 
 #    ifconfig
@@ -120,13 +122,13 @@ connect()
     PTRTD_PID=$!
 
     # Wait for the ptrtd to make its device
-    while ! ip link show $TUNDEV >/dev/null 2>&1 ; do 
+    while ! $IP link show $TUNDEV >/dev/null 2>&1 ; do
 	sleep 0.1
     done
 
     # Now give the ptrtd device back to the parent
-    ip link set $RETURNDEV down
-    /sbin/ip link set $RETURNDEV netns $PARENT_NETNS
+    $IP link set $RETURNDEV down
+    $IP link set $RETURNDEV netns $PARENT_NETNS
 
     #Hm, this doesn't work because the tundev doesn't go away when it should
     #while ip link show $TUNDEV 2> /dev/null ; do
@@ -148,7 +150,7 @@ disconnect()
     RETURNDEV=x$TUNDEV
 
     # This will kill ptrtd inside the netns, leaving the script to clean up
-    ip link del $RETURNDEV
+    $IP link del $RETURNDEV
 
     # XXX: Undo the dnsmasq stuff.
     killall dnsmasq
