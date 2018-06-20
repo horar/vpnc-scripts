@@ -230,18 +230,18 @@ if [ -n "$IPROUTE" ]; then
 
 	set_vpngateway_route() {
 		$IPROUTE route add `$IPROUTE route get "$VPNGATEWAY" | fix_ip_get_output`
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	del_vpngateway_route() {
 		$IPROUTE route $route_syntax_del "$VPNGATEWAY"
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	set_default_route() {
 		$IPROUTE route | grep '^default' | fix_ip_get_output > "$DEFAULT_ROUTE_FILE"
 		$IPROUTE route replace default dev "$TUNDEV"
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	set_network_route() {
@@ -255,7 +255,7 @@ if [ -n "$IPROUTE" ]; then
 		else
 			$IPROUTE route replace "$NETWORK/$NETMASKLEN" dev "$NETDEV"
 		fi
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	set_exclude_route() {
@@ -265,7 +265,7 @@ if [ -n "$IPROUTE" ]; then
 		NETMASK="$2"
 		NETMASKLEN="$3"
 		$IPROUTE route add `$IPROUTE route get "$NETWORK/$NETMASKLEN" | fix_ip_get_output`
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	del_exclude_route() {
@@ -275,13 +275,13 @@ if [ -n "$IPROUTE" ]; then
 		NETMASK="$2"
 		NETMASKLEN="$3"
 		$IPROUTE route $route_syntax_del "$NETWORK/$NETMASKLEN"
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	reset_default_route() {
 		if [ -s "$DEFAULT_ROUTE_FILE" ]; then
 			$IPROUTE route replace `cat "$DEFAULT_ROUTE_FILE"`
-			$IPROUTE route flush cache
+			$IPROUTE route flush cache 2>/dev/null
 			rm -f -- "$DEFAULT_ROUTE_FILE"
 		fi
 	}
@@ -292,13 +292,13 @@ if [ -n "$IPROUTE" ]; then
 		NETMASKLEN="$3"
 		NETDEV="$4"
 		$IPROUTE route $route_syntax_del "$NETWORK/$NETMASKLEN" dev "$NETDEV"
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	set_ipv6_default_route() {
 		# We don't save/restore IPv6 default route; just add a higher-priority one.
 		$IPROUTE -6 route add default dev "$TUNDEV" metric 1
-		$IPROUTE -6 route flush cache
+		$IPROUTE -6 route flush cache 2>/dev/null
 	}
 
 	set_ipv6_network_route() {
@@ -311,7 +311,7 @@ if [ -n "$IPROUTE" ]; then
 		else
 			$IPROUTE -6 route replace "$NETWORK/$NETMASKLEN" dev "$NETDEV"
 		fi
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	set_ipv6_exclude_route() {
@@ -320,12 +320,12 @@ if [ -n "$IPROUTE" ]; then
 		NETWORK="$1"
 		NETMASKLEN="$2"
 		$IPROUTE -6 route add `$IPROUTE route get "$NETWORK/$NETMASKLEN" | fix_ip_get_output`
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	reset_ipv6_default_route() {
 		$IPROUTE -6 route del default dev "$TUNDEV"
-		$IPROUTE route flush cache
+		$IPROUTE route flush cache 2>/dev/null
 	}
 
 	del_ipv6_network_route() {
@@ -333,7 +333,7 @@ if [ -n "$IPROUTE" ]; then
 		NETMASKLEN="$2"
 		NETDEV="$3"
 		$IPROUTE -6 route del "$NETWORK/$NETMASKLEN" dev "$NETDEV"
-		$IPROUTE -6 route flush cache
+		$IPROUTE -6 route flush cache 2>/dev/null
 	}
 
 	del_ipv6_exclude_route() {
@@ -342,7 +342,7 @@ if [ -n "$IPROUTE" ]; then
 		NETWORK="$1"
 		NETMASKLEN="$2"
 		$IPROUTE -6 route del "$NETWORK/$NETMASKLEN"
-		$IPROUTE -6 route flush cache
+		$IPROUTE -6 route flush cache 2>/dev/null
 	}
 else # use route command
 	get_default_gw() {
