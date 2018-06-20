@@ -116,7 +116,7 @@ else
 	ifconfig_syntax_ptpv6=""
 fi
 
-grep ^hosts /etc/nsswitch.conf|grep resolve >/dev/null 2>&1
+grep ^hosts /etc/nsswitch.conf 2>/dev/null|grep resolve >/dev/null 2>&1
 if [ $? = 0 ];then
 	RESOLVEDENABLED=1
 else
