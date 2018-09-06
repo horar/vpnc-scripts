@@ -131,6 +131,11 @@ case "connect":
 		}
 	}
 
+	// Set the default domain
+	if (env("CISCO_DEF_DOMAIN")) {
+		exec("wmic path Win32_NetworkAdapterConfiguration where InterfaceIndex=" + env("TUNIDX") + " call SetDNSDomain " + env("CISCO_DEF_DOMAIN"));
+	}
+
 	echo("Configuring " + env("TUNIDX") + " interface for Legacy IP...");
 	
 	if (!env("CISCO_SPLIT_INC") && REDIRECT_GATEWAY_METHOD != 2) {
