@@ -203,7 +203,7 @@ case "connect":
 		if (env("CISCO_IPV6_SPLIT_INC")) {
 			for (var i = 0 ; i < parseInt(env("CISCO_IPV6_SPLIT_INC")); i++) {
 				var network = env("CISCO_IPV6_SPLIT_INC_" + i + "_ADDR");
-				var netmasklen = env("CISCO_SPLIT_INC_" + i + "_MASKLEN");
+				var netmasklen = env("CISCO_IPV6_SPLIT_INC_" + i + "_MASKLEN");
 				exec("netsh interface ipv6 add route " + network + "/" + netmasklen + " " + env("TUNIDX") + " fe80::8 store=active");
 			}
 		} else {
@@ -255,6 +255,16 @@ case "disconnect":
 		for (var i = 0 ; i < parseInt(env("CISCO_SPLIT_LCL")); i++) {
 			var network = env("CISCO_SPLIT_LCL_" + i + "_ADDR");
 			var netmask = env("CISCO_SPLIT_LCL_" + i + "_MASK");
+			exec("route delete " + network);
+		}
+	}
+
+	// Take Down IPv6 Split Tunnel Server-side Network Routes
+	if (env("CISCO_IPV6_SPLIT_INC")) {
+		echo(">Removing IPv6 Split Tunnel INC Server-side Network Routes:");
+		for (var i = 0 ; i < parseInt(env("CISCO_IPV6_SPLIT_INC")); i++) {
+			var network = env("CISCO_IPV6_SPLIT_INC_" + i + "_ADDR");
+			var masklen = env("CISCO_IPV6_SPLIT_INC_" + i + "_MASKLEN");
 			exec("route delete " + network);
 		}
 	}
