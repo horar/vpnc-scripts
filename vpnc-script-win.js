@@ -116,7 +116,8 @@ case "connect":
     if (env("INTERNAL_IP4_DNS")) {
 		var dns = env("INTERNAL_IP4_DNS").split(/ /);
 		for (var i = 0; i < dns.length; i++) {
-	                run("netsh interface ip add dns \"" +
+			var protocol = dns[i].indexOf(":") !== -1 ? "ipv6" : "ipv4";
+			run("netsh interface " + protocol + " add dns \"" +
 			    env("TUNDEV") + "\" " + dns[i]
 			    + " index=" + (i+1));
 		}
