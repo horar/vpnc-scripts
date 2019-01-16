@@ -21,7 +21,7 @@
 ################
 #
 # List of parameters passed through environment
-#* reason                       -- why this script was called, one of: pre-init connect disconnect reconnect
+#* reason                       -- why this script was called, one of: pre-init connect disconnect reconnect attempt-reconnect
 #* VPNGATEWAY                   -- vpn gateway address (always present)
 #* TUNDEV                       -- tunnel device (always present)
 #* INTERNAL_IP4_ADDRESS         -- address (always present)
@@ -1018,7 +1018,15 @@ case "$reason" in
 		do_disconnect
 		run_hooks post-disconnect
 		;;
+	attempt-reconnect)
+		# Invoked before each attempt to re-establish the session.
+		# If the underlying physical connection changed, we might
+		# be left with a route to the VPN server through the VPN
+		# itself, which would need to be fixed.
+		run_hooks attempt-reconnect
+		;;
 	reconnect)
+	        # After successfully re-establishing the session.
 		run_hooks reconnect
 		;;
 	*)
