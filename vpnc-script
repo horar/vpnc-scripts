@@ -1026,7 +1026,7 @@ case "$reason" in
 		run_hooks attempt-reconnect
 		;;
 	reconnect)
-	        # After successfully re-establishing the session.
+		# After successfully re-establishing the session.
 		run_hooks reconnect
 		;;
 	*)
