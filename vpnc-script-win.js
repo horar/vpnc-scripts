@@ -222,6 +222,16 @@ case "connect":
 	break;
 case "disconnect":
 	var gw = getDefaultGateway();
+	var address_array = env("INTERNAL_IP4_ADDRESS").split(".");
+	var netmask_array = env("INTERNAL_IP4_NETMASK").split(".");
+	// Calculate the first usable address in subnet
+	var internal_gw_array = new Array(
+		address_array[0] & netmask_array[0],
+		address_array[1] & netmask_array[1],
+		address_array[2] & netmask_array[2],
+		(address_array[3] & netmask_array[3]) + 1
+	);
+	var internal_gw = internal_gw_array.join(".");
 
 	echo("Default Gateway: " + gw)
 	echo("Interface idx: " + env("TUNIDX") + " (\"" + env("TUNDEV") + "\")");
@@ -232,7 +242,7 @@ case "disconnect":
 
 	// Restore direct route
 	echo("Restoring Direct Route");
-	exec("route delete 0.0.0.0 mask 0.0.0.0 ");
+	exec("route delete 0.0.0.0 mask 0.0.0.0 internal_gw");
 	exec("route add 0.0.0.0 mask 0.0.0.0 " + gw);
 
 	// ReSet Tunnel Adapter IP = nothing
