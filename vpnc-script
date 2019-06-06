@@ -88,9 +88,6 @@ if [ ! -d "/var/run/vpnc" ]; then
 	[ -x /sbin/restorecon ] && /sbin/restorecon /var/run/vpnc
 fi
 
-# stupid SunOS: no blubber in /usr/local/bin ... (on stdout)
-IPROUTE="`which ip 2> /dev/null | grep '^/'`"
-
 if ifconfig --help 2>&1 | grep BusyBox > /dev/null; then
 	ifconfig_syntax_inet=""
 else
@@ -98,11 +95,15 @@ else
 fi
 
 if [ "$OS" = "Linux" ]; then
+	IPROUTE="`which ip 2> /dev/null | grep '^/'`"
 	ifconfig_syntax_ptp="pointopoint"
 	route_syntax_gw="gw"
 	route_syntax_del="del"
 	route_syntax_netmask="netmask"
 else
+	# iproute2 is Linux only; if `which ip` returns something on another OS, it's likely an unrelated tool
+	# (see https://github.com/dlenski/openconnect/issues/132#issuecomment-470475009)
+	IPROUTE=""
 	ifconfig_syntax_ptp=""
 	route_syntax_gw=""
 	route_syntax_del="delete"
