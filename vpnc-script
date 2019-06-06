@@ -882,10 +882,10 @@ do_connect() {
 		while [ $i -lt $CISCO_IPV6_SPLIT_INC ] ; do
 			eval NETWORK="\${CISCO_IPV6_SPLIT_INC_${i}_ADDR}"
 			eval NETMASKLEN="\${CISCO_IPV6_SPLIT_INC_${i}_MASKLEN}"
-			if [ $NETMASKLEN -lt 128 ]; then
-				set_ipv6_network_route "$NETWORK" "$NETMASKLEN" "$TUNDEV"
-			else
+			if [ $NETMASKLEN -eq 0 ]; then
 				set_ipv6_default_route
+			else
+				set_ipv6_network_route "$NETWORK" "$NETMASKLEN" "$TUNDEV"
 			fi
 			i=`expr $i + 1`
 		done
@@ -1027,7 +1027,7 @@ case "$reason" in
 		run_hooks attempt-reconnect
 		;;
 	reconnect)
-	        # After successfully re-establishing the session.
+		# After successfully re-establishing the session.
 		run_hooks reconnect
 		;;
 	*)
