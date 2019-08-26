@@ -156,7 +156,7 @@ case "connect":
 		var dns = env("INTERNAL_IP4_DNS").split(/ /);
 		for (var i = 0; i < dns.length; i++) {
 			var protocol = dns[i].indexOf(":") !== -1 ? "ipv6" : "ipv4";
-			exec("netsh interface " + protocol + " add dns " + tundevid + " " + dns[i] + " index=" + (i+1));
+			exec("netsh interface " + protocol + " add dns " + env("TUNIDX") + " " + dns[i] + " index=" + (i+1));
 		}
 	}
 	echo("done.");
