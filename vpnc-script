@@ -226,7 +226,7 @@ destroy_tun_device() {
 if [ -n "$IPROUTE" ]; then
 	fix_ip_get_output () {
 		sed -e 's/ /\n/g' | \
-		    sed -ne '1p;/via/{N;p};/dev/{N;p};/src/{N;p};/mtu/{N;p}'
+		    sed -ne "1 s|\$|${1}|p;/via/{N;p};/dev/{N;p};/src/{N;p};/mtu/{N;p}"
 	}
 
 	set_vpngateway_route() {
@@ -265,7 +265,7 @@ if [ -n "$IPROUTE" ]; then
 		NETWORK="$1"
 		NETMASK="$2"
 		NETMASKLEN="$3"
-		$IPROUTE route add `$IPROUTE route get "$NETWORK/$NETMASKLEN" | fix_ip_get_output`
+		$IPROUTE route add `$IPROUTE route get "$NETWORK" | fix_ip_get_output "/$NETMASKLEN"`
 		$IPROUTE route flush cache 2>/dev/null
 	}
 
@@ -320,7 +320,7 @@ if [ -n "$IPROUTE" ]; then
 		# (keep traffic separate from VPN tunnel)
 		NETWORK="$1"
 		NETMASKLEN="$2"
-		$IPROUTE -6 route add `$IPROUTE route get "$NETWORK/$NETMASKLEN" | fix_ip_get_output`
+		$IPROUTE -6 route add `$IPROUTE route get "$NETWORK" | fix_ip_get_output "/$NETMASKLEN"`
 		$IPROUTE route flush cache 2>/dev/null
 	}
 
