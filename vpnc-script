@@ -226,8 +226,7 @@ destroy_tun_device() {
 if [ -n "$IPROUTE" ]; then
 	fix_ip_get_output () {
 		sed -e 's/ /\n/g' | \
-		    sed -ne '1p;/via/{N;p};/dev/{N;p};/src/{N;p};/mtu/{N;p}' | \
-		    sed -e "1 s|$|${1}|"
+		    sed -ne "1 s|\$|${1}|p;/via/{N;p};/dev/{N;p};/src/{N;p};/mtu/{N;p}"
 	}
 
 	set_vpngateway_route() {
