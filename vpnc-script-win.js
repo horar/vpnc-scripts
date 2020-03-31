@@ -188,6 +188,21 @@ case "connect":
 			exec("route add 128.0.0.0 mask 128.0.0.0 " + internal_gw);
 		}
 	}
+	// Add excluded routes
+	if (env("CISCO_SPLIT_EXC")) {
+		// Waiting for the interface to be configured before to add routes
+		if (!waitForInterface()) {
+			echo("Interface does not seem to be up.");
+		}
+		
+		for (var i = 0 ; i < parseInt(env("CISCO_SPLIT_EXC")); i++) {
+			var network = env("CISCO_SPLIT_EXC_" + i + "_ADDR");
+			var netmask = env("CISCO_SPLIT_EXC_" + i + "_MASK");
+			var netmasklen = env("CISCO_SPLIT_EXC_" + i + "_MASKLEN");
+			exec("route add " + network + " mask " + netmask +
+				" " + gw);
+		}
+	}
 	echo("Route configuration done.");
 
 	if (env("INTERNAL_IP6_ADDRESS")) {
@@ -267,6 +282,17 @@ case "disconnect":
 			var network = env("CISCO_SPLIT_LCL_" + i + "_ADDR");
 			var netmask = env("CISCO_SPLIT_LCL_" + i + "_MASK");
 			exec("route delete " + network);
+		}
+	}
+	
+	// Take Down IPv4 Split Tunnel Excluded Network Routes		
+	if (env("CISCO_SPLIT_EXC")) {
+		echo("Removing IPv4 Split Tunnel Excluded Network Routes:");
+		for (var i = 0 ; i < parseInt(env("CISCO_SPLIT_EXC")); i++) {
+			var network = env("CISCO_SPLIT_EXC_" + i + "_ADDR");
+			var netmask = env("CISCO_SPLIT_EXC_" + i + "_MASK");
+			var netmasklen = env("CISCO_SPLIT_EXC_" + i + "_MASKLEN");
+			exec("route delete " + network + " mask " + netmask );
 		}
 	}
 }
